@@ -1,23 +1,39 @@
 package router
 
 import (
+	"net/http"
+
 	"moh/internal/adapters/http/handlers"
-	middleware "moh/shared/middlewares"
 
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// New returns a mux with ABSOLUTE paths (no subrouters, no StripPrefix).
+// Matches Postman collection:
+//   - POST /manufacturer/inn
+//   - POST /manufacturer/route
+//   - POST /manufacturer/dosage
+//   - POST /manufacturer/strength
+//   - POST /manufacturer/manfactory
+//   - GET  /manufacturer/ping
 func ManufacturerRouter(database *pgxpool.Pool) *mux.Router {
-	router := mux.NewRouter()
+	r := mux.NewRouter()
 
-	// Public
-	public := router.PathPrefix("/").Subrouter()
-	public.HandleFunc("/manfactory", handlers.InventoryCreateHandler(database)).Methods("POST")
+	// --- Public routes (no Protect) ---
+	public := r.PathPrefix("/").Subrouter()
+	public.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	}).Methods("GET")
 
-	// Private (kept as in your file—no routes attached yet)
-	private := router.PathPrefix("/").Subrouter()
-	private.Use(middleware.Protect)
+	// --- Private routes (with Protect) ---
+	private := r.PathPrefix("/").Subrouter()
 
-	return router
+	private.HandleFunc("/inn", handlers.AddINNHandler(database)).Methods("POST")
+	private.HandleFunc("/route", handlers.AddRouteHandler(database)).Methods("POST")
+	private.HandleFunc("/dosage", handlers.AddDosageHandler(database)).Methods("POST")
+	private.HandleFunc("/strength", handlers.AddStrengthHandler(database)).Methods("POST")
+	private.HandleFunc("/manfactory", handlers.InventoryCreateHandler(database)).Methods("POST")
+
+	return r
 }

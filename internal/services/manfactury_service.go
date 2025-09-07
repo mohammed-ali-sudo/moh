@@ -12,12 +12,10 @@ import (
 )
 
 func AddManufacturerSite(ctx context.Context, db *pgxpool.Pool, m models.ManufacturerSite) (models.ManufacturerSite, error) {
-	// Ensure ID (your DB schema expects app-supplied UUID in the no-extensions variant)
-	if m.ID == "" {
-		m.ID = uuid.NewString()
-	}
+	// Always generate a fresh UUID (ignore any client-provided id)
+	m.ID = uuid.NewString()
 
-	// Validate again at service level
+	// Validate after ID is set
 	if msg, ok := m.Validate(); !ok {
 		return models.ManufacturerSite{}, errors.New(msg)
 	}
