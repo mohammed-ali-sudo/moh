@@ -2,29 +2,25 @@ package middleware
 
 import (
 	"log"
-	"net/http"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
-// responseWriter wraps http.ResponseWriter to capture status code.
-type responseWriter struct {
-	http.ResponseWriter
-	status int
-}
-
-func (rw *responseWriter) WriteHeader(code int) {
-	rw.status = code
-	rw.ResponseWriter.WriteHeader(code)
-}
-
-// ResponseTimeMw logs the request duration and adds X-Response-Time.
-func ResponseTimeMw(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// ResponseTimeGin logs the request duration and adds X-Response-Time header (Gin version).
+// Usage: r.Use(middleware.ResponseTimeGin())
+func ResponseTimeGin() gin.HandlerFunc {
+	return func(c *gin.Context) {
 		start := time.Now()
-		rw := &responseWriter{ResponseWriter: w, status: http.StatusOK}
-		next.ServeHTTP(rw, r)
-		duration := time.Since(start)
-		rw.Header().Set("X-Response-Time", duration.String())
-		log.Printf("[%s] %s %d %s", r.Method, r.URL.Path, rw.status, duration)
-	})
+		c.Next() // process request
+
+		dur := time.Since(start)
+		// Add the response time header (may be ignored if headers already sent)
+		c.Writer.Header().Set("X-Response-Time", dur.String())
+
+		status := c.Writer.Status()
+		method := c.Request.Method
+		path := c.Request.URL.Path
+		log.Printf("[%s] %s %d %s", method, path, status, dur)
+	}
 }

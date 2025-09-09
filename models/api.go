@@ -3,12 +3,12 @@ package models
 
 import "time"
 
-type MarketingAuthorization struct {
+type API struct {
     ID        string     `json:"id" db:"id" validate:"omitempty,uuid4"`
     Name      string     `json:"name" db:"name" validate:"required,notblank,max=200"`
-    Country   string     `json:"country" db:"country" validate:"required,alpha,uppercase,len=2"`
+    Status    APIStatus  `json:"status" db:"status" validate:"required,oneof=active inactive withdrawn banned"`
     CreatedAt *time.Time `json:"created_at,omitempty" db:"created_at"`
     UpdatedAt *time.Time `json:"updated_at,omitempty" db:"updated_at"`
 }
 
-func (m *MarketingAuthorization) Validate() error { return validate.Struct(m) }
+func (m *API) Validate() error { return validate.Struct(m) }

@@ -1,8 +1,14 @@
+
 package models
 
+import "time"
+
 type DosageForm struct {
-	Code string `json:"code" db:"code" validate:"required,uppercase,alphanum,max=16"`
-	Name string `json:"name" db:"name" validate:"required,min=2,max=80"`
+    ID        string     `json:"id" db:"id" validate:"omitempty,uuid4"`
+    Code      string     `json:"code" db:"code" validate:"required,notblank,max=32"`
+    Name      string     `json:"name" db:"name" validate:"required,notblank,max=120"`
+    CreatedAt *time.Time `json:"created_at,omitempty" db:"created_at"`
+    UpdatedAt *time.Time `json:"updated_at,omitempty" db:"updated_at"`
 }
 
-func (m DosageForm) Validate() (string, bool) { return FirstError(validate.Struct(m)) }
+func (m *DosageForm) Validate() error { return validate.Struct(m) }

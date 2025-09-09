@@ -3,87 +3,101 @@ package middleware
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
+	"github.com/gin-gonic/gin"
 	"github.com/microcosm-cc/bluemonday"
 )
 
-// XssValidator is a middleware that sanitizes all incoming request bodies,
-// paths, and query parameters to prevent Cross-Site Scripting (XSS) attacks.
-func XssValidator(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("XSS validator is starting...")
-
+// XssValidatorGin sanitizes path, query params, and JSON bodies.
+// Usage: r.Use(middleware.XssValidatorGin())
+func XssValidatorGin() gin.HandlerFunc {
+	return func(c *gin.Context) {
 		// ---- Sanitize Path ----
-		r.URL.Path = saintiaizeString(r.URL.Path)
+		c.Request.URL.Path = sanitizeString(c.Request.URL.Path)
 
 		// ---- Sanitize Query Parameters ----
 		sanitizedQuery := url.Values{}
-		for key, values := range r.URL.Query() {
-			safeKey := saintiaizeString(key)
+		for key, values := range c.Request.URL.Query() {
+			safeKey := sanitizeString(key)
 			for _, v := range values {
-				safeVal := saintiaizeString(v)
+				safeVal := sanitizeString(v)
 				sanitizedQuery.Add(safeKey, safeVal)
 			}
 		}
-		r.URL.RawQuery = sanitizedQuery.Encode()
+		c.Request.URL.RawQuery = sanitizedQuery.Encode()
 
-		// ---- Sanitize JSON Body ----
-		if r.Body != nil && r.ContentLength > 0 &&
-			strings.Contains(r.Header.Get("Content-Type"), "application/json") {
+		// ---- Sanitize JSON Body (if present) ----
+		if c.Request.Body != nil &&
+			(strings.Contains(c.GetHeader("Content-Type"), "application/json")) {
 
-			bodyBytes, err := io.ReadAll(r.Body)
+			// Read body (it’s a one-shot reader)
+			bodyBytes, err := io.ReadAll(c.Request.Body)
 			if err != nil {
-				http.Error(w, "failed to read request body", http.StatusBadRequest)
+				c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+					"error":   "invalid_body",
+					"message": "failed to read request body",
+				})
 				return
 			}
+			// Restore empty body if nothing there
+			if len(bodyBytes) == 0 {
+				c.Request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+			} else {
+				var payload any
+				if err := json.Unmarshal(bodyBytes, &payload); err != nil {
+					c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+						"error":   "invalid_json",
+						"message": "invalid JSON body",
+					})
+					return
+				}
 
-			// Decode JSON into a generic structure
-			var payload any
-			if err := json.Unmarshal(bodyBytes, &payload); err != nil {
-				http.Error(w, "invalid JSON body", http.StatusBadRequest)
-				return
+				cleaned, err := clean(payload)
+				if err != nil {
+					c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+						"error":   "sanitize_failed",
+						"message": "failed to sanitize JSON",
+					})
+					return
+				}
+
+				safeBytes, err := json.Marshal(cleaned)
+				if err != nil {
+					c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+						"error":   "sanitize_failed",
+						"message": "failed to re-encode JSON",
+					})
+					return
+				}
+
+				// Replace request body with sanitized JSON
+				c.Request.Body = io.NopCloser(bytes.NewReader(safeBytes))
+				// Update Content-Length header (optional, harmless to set)
+				c.Request.ContentLength = int64(len(safeBytes))
+				c.Request.Header.Set("Content-Length", strconv.FormatInt(int64(len(safeBytes)), 10))
 			}
-
-			// Recursively clean
-			cleaned, err := clean(payload)
-			if err != nil {
-				http.Error(w, "failed to sanitize JSON", http.StatusInternalServerError)
-				return
-			}
-
-			// Re-encode sanitized JSON
-			safeBytes, err := json.Marshal(cleaned)
-			if err != nil {
-				http.Error(w, "failed to re-encode JSON", http.StatusInternalServerError)
-				return
-			}
-
-			// Replace body with sanitized JSON
-			r.Body = io.NopCloser(bytes.NewBuffer(safeBytes))
-			r.ContentLength = int64(len(safeBytes))
 		}
 
-		// Continue to next handler
-		next.ServeHTTP(w, r)
-	})
+		c.Next()
+	}
 }
 
-// Recursively clean any arbitrary structure (map/slice/string).
+// --- helpers ---
+
 func clean(data any) (any, error) {
 	switch v := data.(type) {
 	case map[string]any:
 		for key, value := range v {
-			sanitizedKey := saintiaizeString(key)
-			sanitizedVal, err := sanitiazeValue(value)
+			sanitizedKey := sanitizeString(key)
+			sanitizedVal, err := sanitizeValue(value)
 			if err != nil {
 				return nil, err
 			}
-			// If key changed, move it
 			if sanitizedKey != key {
 				delete(v, key)
 				v[sanitizedKey] = sanitizedVal
@@ -94,7 +108,7 @@ func clean(data any) (any, error) {
 		return v, nil
 	case []any:
 		for i, item := range v {
-			sanitized, err := sanitiazeValue(item)
+			sanitized, err := sanitizeValue(item)
 			if err != nil {
 				return nil, err
 			}
@@ -102,14 +116,14 @@ func clean(data any) (any, error) {
 		}
 		return v, nil
 	default:
-		return sanitiazeValue(v)
+		return sanitizeValue(v)
 	}
 }
 
-func sanitiazeValue(value any) (any, error) {
+func sanitizeValue(value any) (any, error) {
 	switch v := value.(type) {
 	case string:
-		return saintiaizeString(v), nil
+		return sanitizeString(v), nil
 	case map[string]any:
 		return clean(v)
 	case []any:
@@ -119,6 +133,6 @@ func sanitiazeValue(value any) (any, error) {
 	}
 }
 
-func saintiaizeString(value string) string {
+func sanitizeString(value string) string {
 	return bluemonday.UGCPolicy().Sanitize(value)
 }

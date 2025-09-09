@@ -3,7 +3,7 @@ package models
 
 import "time"
 
-type MarketingAuthorization struct {
+type ManufacturingSite struct {
     ID        string     `json:"id" db:"id" validate:"omitempty,uuid4"`
     Name      string     `json:"name" db:"name" validate:"required,notblank,max=200"`
     Country   string     `json:"country" db:"country" validate:"required,alpha,uppercase,len=2"`
@@ -11,4 +11,4 @@ type MarketingAuthorization struct {
     UpdatedAt *time.Time `json:"updated_at,omitempty" db:"updated_at"`
 }
 
-func (m *MarketingAuthorization) Validate() error { return validate.Struct(m) }
+func (m *ManufacturingSite) Validate() error { return validate.Struct(m) }

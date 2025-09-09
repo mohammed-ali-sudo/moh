@@ -1,19 +1,10 @@
-# MoH Registry Models (Go)
 
-- One file per model under `models/`
-- Simple, general `FirstError()` returning "`Field` is invalid"
-- All IDs are `string` with `validate:"uuid4"` (except BIGSERIAL IDs for Outbox/Audit)
-- Uses: `github.com/go-playground/validator/v10`
+# models (clean)
 
-## Usage
+Drop these files into your `models/` folder. Remove any older copies that had
+string-concatenated tags (e.g. `+ "json:..." +`). Keep ONLY this `validation.go` (delete any `validations.go`).
 
-```go
-import "path/to/models"
-
-drug := models.Drug{
-    // ...
-}
-if msg, ok := drug.Validate(); !ok {
-    // handle msg
-}
-```
+After copying:
+  go get github.com/go-playground/validator/v10
+  go mod tidy
+  go build ./...

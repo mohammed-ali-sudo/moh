@@ -5,35 +5,30 @@ import (
 
 	"moh/internal/adapters/http/handlers"
 
-	"github.com/gorilla/mux"
+	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// New returns a mux with ABSOLUTE paths (no subrouters, no StripPrefix).
-// Matches Postman collection:
+// ManufacturerRouter registers routes under /manufacturer on the given Gin engine.
+// Mirrors your mux endpoints:
+//   - GET  /manufacturer/ping
 //   - POST /manufacturer/inn
 //   - POST /manufacturer/route
 //   - POST /manufacturer/dosage
 //   - POST /manufacturer/strength
 //   - POST /manufacturer/manfactory
-//   - GET  /manufacturer/ping
-func ManufacturerRouter(database *pgxpool.Pool) *mux.Router {
-	r := mux.NewRouter()
+func ManufacturerRouter(r *gin.Engine, db *pgxpool.Pool) {
+	group := r.Group("/manufacturer")
 
-	// --- Public routes (no Protect) ---
-	public := r.PathPrefix("/").Subrouter()
-	public.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("ok"))
-	}).Methods("GET")
+	// Public
+	group.GET("/ping", func(c *gin.Context) {
+		c.String(http.StatusOK, "ok")
+	})
 
-	// --- Private routes (with Protect) ---
-	private := r.PathPrefix("/").Subrouter()
-
-	private.HandleFunc("/inn", handlers.AddINNHandler(database)).Methods("POST")
-	private.HandleFunc("/route", handlers.AddRouteHandler(database)).Methods("POST")
-	private.HandleFunc("/dosage", handlers.AddDosageHandler(database)).Methods("POST")
-	private.HandleFunc("/strength", handlers.AddStrengthHandler(database)).Methods("POST")
-	private.HandleFunc("/manfactory", handlers.InventoryCreateHandler(database)).Methods("POST")
-
-	return r
+	// Private (attach auth middleware to 'group' if needed)
+	group.POST("/inn", handlers.AddAPIHandler(db))                      // INN => API
+	group.POST("/route", handlers.AddRouteOfAdminHandler(db))           // Route of admin
+	group.POST("/dosage", handlers.AddDosageFormHandler(db))            // Dosage form
+	group.POST("/strength", handlers.AddStrengthUnitHandler(db))        // Strength unit
+	group.POST("/manfactory", handlers.AddManufacturingSiteHandler(db)) // Manufacturing site
 }
