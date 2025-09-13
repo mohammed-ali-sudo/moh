@@ -1,4 +1,3 @@
-
 package services
 
 import (
@@ -6,14 +5,14 @@ import (
 	"errors"
 	"strings"
 
+	"moh/models"
+
 	"github.com/georgysavva/scany/v2/pgxscan"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"moh/models"
 )
 
-// AddDrug creates a drug row.
 func AddDrug(ctx context.Context, db *pgxpool.Pool, in models.Drug) (models.Drug, error) {
 	in.ID = uuid.NewString()
 	in.BrandName = strings.TrimSpace(in.BrandName)
@@ -24,12 +23,17 @@ func AddDrug(ctx context.Context, db *pgxpool.Pool, in models.Drug) (models.Drug
 	}
 
 	const q = `
-		INSERT INTO drug (id, brand_name, dosage_form_id, route_id, strength_unit_id, dose)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING id, brand_name, dosage_form_id, route_id, strength_unit_id, dose, created_at, updated_at
-	`
+        INSERT INTO public.drugs
+            (id, brand_name, dosage_form_id, route_id, strength_unit_id, dose, api_id)
+        VALUES
+            ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING
+            id, brand_name, dosage_form_id, route_id, strength_unit_id, dose, api_id, created_at, updated_at
+    `
 	var out models.Drug
-	if err := pgxscan.Get(ctx, db, &out, q, in.ID, in.BrandName, in.DosageFormID, in.RouteID, in.StrengthUnitID, in.Dose); err != nil {
+	if err := pgxscan.Get(ctx, db, &out, q,
+		in.ID, in.BrandName, in.DosageFormID, in.RouteID, in.StrengthUnitID, in.Dose, in.APIID,
+	); err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
 			switch pgErr.Code {
@@ -72,36 +76,6 @@ func AddBatch(ctx context.Context, db *pgxpool.Pool, in models.Batch) (models.Ba
 			}
 		}
 		return models.Batch{}, err
-	}
-	return out, nil
-}
-
-// AddDrugAPI links a drug to an API with a strength.
-func AddDrugAPI(ctx context.Context, db *pgxpool.Pool, in models.DrugAPI) (models.DrugAPI, error) {
-	in.ID = uuid.NewString()
-
-	if err := in.Validate(); err != nil {
-		msg, _ := models.FirstError(err)
-		return models.DrugAPI{}, errors.New(msg)
-	}
-
-	const q = `
-		INSERT INTO drug_api (id, drug_id, api_id, strength_value, strength_unit_id)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, drug_id, api_id, strength_value, strength_unit_id
-	`
-	var out models.DrugAPI
-	if err := pgxscan.Get(ctx, db, &out, q, in.ID, in.DrugID, in.APIID, in.StrengthValue, in.StrengthUnitID); err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) {
-			switch pgErr.Code {
-			case "23503":
-				return models.DrugAPI{}, errors.New("invalid foreign key")
-			case "23505":
-				return models.DrugAPI{}, errors.New("link already exists")
-			}
-		}
-		return models.DrugAPI{}, err
 	}
 	return out, nil
 }
@@ -196,4 +170,93 @@ func AddDrugRegistrationAuthHolder(ctx context.Context, db *pgxpool.Pool, in mod
 		return models.DrugRegistrationAuthHolder{}, err
 	}
 	return out, nil
+}
+
+func ListDosageForms(ctx context.Context, db *pgxpool.Pool) ([]models.DosageForm, error) {
+	const q = `SELECT id, code, name, created_at, updated_at
+	           FROM public.dosage_forms ORDER BY code`
+	var out []models.DosageForm
+	return out, pgxscan.Select(ctx, db, &out, q)
+}
+
+func ListStrengthUnits(ctx context.Context, db *pgxpool.Pool) ([]models.StrengthUnit, error) {
+	const q = `SELECT id, code, name, created_at, updated_at
+	           FROM public.strength_units ORDER BY code`
+	var out []models.StrengthUnit
+	return out, pgxscan.Select(ctx, db, &out, q)
+}
+
+func ListRoutesOfAdmin(ctx context.Context, db *pgxpool.Pool) ([]models.RouteOfAdmin, error) {
+	const q = `SELECT id, code, name, created_at, updated_at
+	           FROM public.routes_of_admin ORDER BY code`
+	var out []models.RouteOfAdmin
+	return out, pgxscan.Select(ctx, db, &out, q)
+}
+
+func ListAPIs(ctx context.Context, db *pgxpool.Pool) ([]models.API, error) {
+	const q = `SELECT id, name, status, created_at, updated_at
+	           FROM public.apis ORDER BY lower(name)`
+	var out []models.API
+	return out, pgxscan.Select(ctx, db, &out, q)
+}
+
+func ListManufacturingSites(ctx context.Context, db *pgxpool.Pool) ([]models.ManufacturingSite, error) {
+	const q = `SELECT id, name, country, created_at, updated_at
+	           FROM public.manufacturing_sites ORDER BY lower(name), country`
+	var out []models.ManufacturingSite
+	return out, pgxscan.Select(ctx, db, &out, q)
+}
+
+func ListAuthHolders(ctx context.Context, db *pgxpool.Pool) ([]models.AuthHolder, error) {
+	const q = `SELECT id, name, registration_number, created_at, updated_at
+	           FROM public.auth_holders ORDER BY lower(name)`
+	var out []models.AuthHolder
+	return out, pgxscan.Select(ctx, db, &out, q)
+}
+
+func ListMarketingAuthorizations(ctx context.Context, db *pgxpool.Pool) ([]models.MarketingAuthorization, error) {
+	const q = `SELECT id, name, country, created_at, updated_at
+	           FROM public.marketing_authorizations ORDER BY lower(name), country`
+	var out []models.MarketingAuthorization
+	return out, pgxscan.Select(ctx, db, &out, q)
+}
+
+// ===== Domain tables =====
+
+func ListDrugs(ctx context.Context, db *pgxpool.Pool) ([]models.Drug, error) {
+	// Make sure models.Drug has APIID field: `json:"api_id" db:"api_id"`
+	const q = `SELECT id, brand_name, dosage_form_id, route_id, strength_unit_id, dose, api_id, created_at, updated_at
+	           FROM public.drugs ORDER BY lower(brand_name)`
+	var out []models.Drug
+	return out, pgxscan.Select(ctx, db, &out, q)
+}
+
+func ListBatches(ctx context.Context, db *pgxpool.Pool) ([]models.Batch, error) {
+	const q = `SELECT id, drug_id, drug_registration_id, batch_number, mfg_date, expire_date,
+	              qty_in_batch, status, price, recall_reason, created_at, updated_at
+	           FROM public.batches ORDER BY expire_date DESC, batch_number`
+	var out []models.Batch
+	return out, pgxscan.Select(ctx, db, &out, q)
+}
+
+func ListDrugRegistrations(ctx context.Context, db *pgxpool.Pool) ([]models.DrugRegistration, error) {
+	const q = `SELECT id, drug_id, ma_id, registration_number, status, valid_from, valid_to,
+	              is_primary, created_at, updated_at
+	           FROM public.drug_registrations ORDER BY valid_to DESC`
+	var out []models.DrugRegistration
+	return out, pgxscan.Select(ctx, db, &out, q)
+}
+
+func ListDrugRegistrationSites(ctx context.Context, db *pgxpool.Pool) ([]models.DrugRegistrationSite, error) {
+	const q = `SELECT id, drug_registration_id, site_id, role
+	           FROM public.drug_registration_sites ORDER BY role NULLS LAST`
+	var out []models.DrugRegistrationSite
+	return out, pgxscan.Select(ctx, db, &out, q)
+}
+
+func ListDrugRegistrationAuthHolders(ctx context.Context, db *pgxpool.Pool) ([]models.DrugRegistrationAuthHolder, error) {
+	const q = `SELECT id, drug_registration_id, auth_holder_id, role
+	           FROM public.drug_registration_auth_holders ORDER BY role NULLS LAST`
+	var out []models.DrugRegistrationAuthHolder
+	return out, pgxscan.Select(ctx, db, &out, q)
 }
