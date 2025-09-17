@@ -1,14 +1,10 @@
 
+// models/manufacturing_site.go
 package models
 
-import "time"
-
 type ManufacturingSite struct {
-    ID        string     `json:"id" db:"id" validate:"omitempty,uuid4"`
-    Name      string     `json:"name" db:"name" validate:"required,notblank,max=200"`
-    Country   string     `json:"country" db:"country" validate:"required,alpha,uppercase,len=2"`
-    CreatedAt *time.Time `json:"created_at,omitempty" db:"created_at"`
-    UpdatedAt *time.Time `json:"updated_at,omitempty" db:"updated_at"`
+	ID      int64  `json:"id" db:"id" validate:"omitempty"`
+	Name    string `json:"name" db:"name" validate:"required,max=150"`
+	Country string `json:"country" db:"country" validate:"required,max=100"`
 }
-
 func (m *ManufacturingSite) Validate() error { return validate.Struct(m) }

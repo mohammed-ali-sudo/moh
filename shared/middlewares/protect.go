@@ -1,13 +1,15 @@
 package middleware
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strings"
 
+	"github.com/gin-gonic/gin"
 	jwt "github.com/golang-jwt/jwt/v4"
 )
+
+// ---- unchanged: VerifyToken ----
 
 func VerifyToken(tokenString string) (jwt.MapClaims, error) {
 	secret := []byte("jwtsecretstring")
@@ -35,34 +37,62 @@ func VerifyToken(tokenString string) (jwt.MapClaims, error) {
 	return claims, nil
 }
 
-func Protect(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			http.Error(w, "authorization header is missing", http.StatusUnauthorized)
+// ---- gin-native middleware: ProtectGin ----
+
+func ProtectGin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Allow CORS preflight to pass through
+		if c.Request.Method == http.MethodOptions {
+			c.Next()
 			return
 		}
 
-		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-		if tokenString == authHeader {
-			http.Error(w, "invalid authorization header format", http.StatusUnauthorized)
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error":   "unauthorized",
+				"message": "authorization header is missing",
+			})
 			return
 		}
+
+		// Expect "Bearer <token>"
+		const prefix = "Bearer "
+		if !strings.HasPrefix(authHeader, prefix) {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error":   "unauthorized",
+				"message": "invalid authorization header format",
+			})
+			return
+		}
+		tokenString := strings.TrimSpace(strings.TrimPrefix(authHeader, prefix))
 
 		claims, err := VerifyToken(tokenString)
 		if err != nil {
-			// Check for the "token expired" error message
+			msg := "invalid token"
 			if strings.Contains(err.Error(), "token expired") {
-				http.Error(w, "token has expired", http.StatusUnauthorized)
-				return
+				msg = "token has expired"
 			}
-			// For any other validation error, return a generic unauthorized message
-			http.Error(w, "invalid token", http.StatusUnauthorized)
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error":   "unauthorized",
+				"message": msg,
+			})
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), "user_claims", claims)
+		// Save claims in Gin context for handlers
+		c.Set("user_claims", claims)
 
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+		c.Next()
+	}
+}
+
+// Optional helper to fetch claims inside handlers.
+func ClaimsFromContext(c *gin.Context) (jwt.MapClaims, bool) {
+	v, ok := c.Get("user_claims")
+	if !ok {
+		return nil, false
+	}
+	claims, ok := v.(jwt.MapClaims)
+	return claims, ok
 }

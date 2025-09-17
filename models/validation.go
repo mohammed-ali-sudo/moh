@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/go-playground/validator/v10"
 )
@@ -66,6 +65,7 @@ func FirstError(err error) (string, bool) {
 
 // Register custom field and struct validations.
 func init() {
+
 	// notblank: trims spaces before checking
 	_ = validate.RegisterValidation("notblank", func(fl validator.FieldLevel) bool {
 		s, ok := fl.Field().Interface().(string)
@@ -147,40 +147,4 @@ func init() {
 			return false
 		}
 	})
-
-	// -------- Struct-level checks --------
-	validate.RegisterStructValidation(func(sl validator.StructLevel) {
-		b, ok := sl.Current().Interface().(Batch)
-		if !ok {
-			return
-		}
-		if !b.MfgDate.IsZero() && !b.ExpireDate.IsZero() {
-			if !b.ExpireDate.After(b.MfgDate) {
-				sl.ReportError(b.ExpireDate, "ExpireDate", "ExpireDate", "gt_mfg", "")
-			}
-		}
-	}, Batch{})
-
-	validate.RegisterStructValidation(func(sl validator.StructLevel) {
-		dr, ok := sl.Current().Interface().(DrugRegistration)
-		if !ok {
-			return
-		}
-		if !dr.ValidFrom.IsZero() && !dr.ValidTo.IsZero() {
-			if !dr.ValidTo.After(dr.ValidFrom) {
-				sl.ReportError(dr.ValidTo, "ValidTo", "ValidTo", "gt_valid_from", "")
-			}
-		}
-	}, DrugRegistration{})
 }
-
-// Utility helpers
-func IsValidJSON(b json.RawMessage) bool {
-	if len(b) == 0 {
-		return true
-	}
-	var tmp any
-	return json.Unmarshal(b, &tmp) == nil
-}
-
-func TimePtr(t time.Time) *time.Time { return &t }

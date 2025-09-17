@@ -1,14 +1,10 @@
 
+// models/authority_holder.go
 package models
 
-import "time"
-
-type AuthHolder struct {
-    ID                 string     `json:"id" db:"id" validate:"omitempty,uuid4"`
-    Name               string     `json:"name" db:"name" validate:"required,notblank,max=200"`
-    RegistrationNumber string     `json:"registration_number,omitempty" db:"registration_number" validate:"omitempty,max=100"`
-    CreatedAt          *time.Time `json:"created_at,omitempty" db:"created_at"`
-    UpdatedAt          *time.Time `json:"updated_at,omitempty" db:"updated_at"`
+type AuthorityHolder struct {
+	ID      int64  `json:"id" db:"id" validate:"omitempty"`
+	Name    string `json:"name" db:"name" validate:"required,max=150"`
+	Country string `json:"country" db:"country" validate:"required,max=100"`
 }
-
-func (m *AuthHolder) Validate() error { return validate.Struct(m) }
+func (m *AuthorityHolder) Validate() error { return validate.Struct(m) }

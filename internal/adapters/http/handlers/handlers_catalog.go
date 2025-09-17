@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"moh/internal/services"
@@ -11,21 +10,18 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// helper decode with DisallowUnknownFields
-func decodeStrict(c *gin.Context, dst any) error {
-	dec := json.NewDecoder(c.Request.Body)
-	dec.DisallowUnknownFields()
-	return dec.Decode(dst)
-}
+// ----------------------------------------------------------------------------
+// DOSAGE
+// ----------------------------------------------------------------------------
 
-func AddDosageFormHandler(db *pgxpool.Pool) gin.HandlerFunc {
+func AddDosageHandler(db *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var in models.DosageForm
+		var in models.Dosage
 		if err := decodeStrict(c, &in); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_json", "message": err.Error()})
 			return
 		}
-		out, err := services.AddDosageForm(c.Request.Context(), db, in)
+		out, err := services.AddDosage(c.Request.Context(), db, in)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "create_failed", "message": err.Error()})
 			return
@@ -34,14 +30,50 @@ func AddDosageFormHandler(db *pgxpool.Pool) gin.HandlerFunc {
 	}
 }
 
-func AddStrengthUnitHandler(db *pgxpool.Pool) gin.HandlerFunc {
+func GetAllDosagesHandler(db *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var in models.StrengthUnit
+		items, err := services.GetAllDosages(c.Request.Context(), db)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "list_failed", "message": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, items)
+	}
+}
+
+func UpdateDosageHandler(db *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, err := parseIDParam(c, "id")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_id", "message": err.Error()})
+			return
+		}
+		var patch models.Dosage
+		if err := decodeStrict(c, &patch); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_json", "message": err.Error()})
+			return
+		}
+		out, err := services.UpdateDosage(c.Request.Context(), db, id, patch)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "update_failed", "message": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, out)
+	}
+}
+
+// ----------------------------------------------------------------------------
+// ROUTE
+// ----------------------------------------------------------------------------
+
+func AddRouteHandler(db *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var in models.Route
 		if err := decodeStrict(c, &in); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_json", "message": err.Error()})
 			return
 		}
-		out, err := services.AddStrengthUnit(c.Request.Context(), db, in)
+		out, err := services.AddRoute(c.Request.Context(), db, in)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "create_failed", "message": err.Error()})
 			return
@@ -50,14 +82,50 @@ func AddStrengthUnitHandler(db *pgxpool.Pool) gin.HandlerFunc {
 	}
 }
 
-func AddRouteOfAdminHandler(db *pgxpool.Pool) gin.HandlerFunc {
+func GetAllRoutesHandler(db *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var in models.RouteOfAdmin
+		items, err := services.GetAllRoutes(c.Request.Context(), db)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "list_failed", "message": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, items)
+	}
+}
+
+func UpdateRouteHandler(db *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, err := parseIDParam(c, "id")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_id", "message": err.Error()})
+			return
+		}
+		var patch models.Route
+		if err := decodeStrict(c, &patch); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_json", "message": err.Error()})
+			return
+		}
+		out, err := services.UpdateRoute(c.Request.Context(), db, id, patch)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "update_failed", "message": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, out)
+	}
+}
+
+// ----------------------------------------------------------------------------
+// STRENGTH
+// ----------------------------------------------------------------------------
+
+func AddStrengthHandler(db *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var in models.Strength
 		if err := decodeStrict(c, &in); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_json", "message": err.Error()})
 			return
 		}
-		out, err := services.AddRouteOfAdmin(c.Request.Context(), db, in)
+		out, err := services.AddStrength(c.Request.Context(), db, in)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "create_failed", "message": err.Error()})
 			return
@@ -65,6 +133,42 @@ func AddRouteOfAdminHandler(db *pgxpool.Pool) gin.HandlerFunc {
 		c.JSON(http.StatusCreated, out)
 	}
 }
+
+func GetAllStrengthsHandler(db *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		items, err := services.GetAllStrengths(c.Request.Context(), db)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "list_failed", "message": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, items)
+	}
+}
+
+func UpdateStrengthHandler(db *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, err := parseIDParam(c, "id")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_id", "message": err.Error()})
+			return
+		}
+		var patch models.Strength
+		if err := decodeStrict(c, &patch); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_json", "message": err.Error()})
+			return
+		}
+		out, err := services.UpdateStrength(c.Request.Context(), db, id, patch)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "update_failed", "message": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, out)
+	}
+}
+
+// ----------------------------------------------------------------------------
+// API
+// ----------------------------------------------------------------------------
 
 func AddAPIHandler(db *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -82,9 +186,9 @@ func AddAPIHandler(db *pgxpool.Pool) gin.HandlerFunc {
 	}
 }
 
-func ListDosageFormsHandler(db *pgxpool.Pool) gin.HandlerFunc {
+func GetAllAPIsHandler(db *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		items, err := services.ListDosageForms(c.Request.Context(), db)
+		items, err := services.GetAllAPIs(c.Request.Context(), db)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "list_failed", "message": err.Error()})
 			return
@@ -93,123 +197,27 @@ func ListDosageFormsHandler(db *pgxpool.Pool) gin.HandlerFunc {
 	}
 }
 
-func ListStrengthUnitsHandler(db *pgxpool.Pool) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		items, err := services.ListStrengthUnits(c.Request.Context(), db)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "list_failed", "message": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, items)
+func UpdateAPIHandler(db *pgxpool.Pool) gin.HandlerFunc {
+	type apiPatch struct {
+		Name           string `json:"name"`
+		IsPsychotropic *bool  `json:"ispsychotropic"`
 	}
-}
-
-func ListRoutesOfAdminHandler(db *pgxpool.Pool) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		items, err := services.ListRoutesOfAdmin(c.Request.Context(), db)
+		id, err := parseIDParam(c, "id")
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "list_failed", "message": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_id", "message": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, items)
-	}
-}
-
-func ListAPIsHandler(db *pgxpool.Pool) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		items, err := services.ListAPIs(c.Request.Context(), db)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "list_failed", "message": err.Error()})
+		var patch apiPatch
+		if err := decodeStrict(c, &patch); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_json", "message": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, items)
-	}
-}
-
-func ListManufacturingSitesHandler(db *pgxpool.Pool) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		items, err := services.ListManufacturingSites(c.Request.Context(), db)
+		out, err := services.UpdateAPI(c.Request.Context(), db, id, patch.Name, patch.IsPsychotropic)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "list_failed", "message": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "update_failed", "message": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, items)
-	}
-}
-
-func ListAuthHoldersHandler(db *pgxpool.Pool) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		items, err := services.ListAuthHolders(c.Request.Context(), db)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "list_failed", "message": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, items)
-	}
-}
-
-func ListMarketingAuthorizationsHandler(db *pgxpool.Pool) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		items, err := services.ListMarketingAuthorizations(c.Request.Context(), db)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "list_failed", "message": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, items)
-	}
-}
-
-func ListDrugsHandler(db *pgxpool.Pool) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		items, err := services.ListDrugs(c.Request.Context(), db)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "list_failed", "message": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, items)
-	}
-}
-
-func ListBatchesHandler(db *pgxpool.Pool) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		items, err := services.ListBatches(c.Request.Context(), db)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "list_failed", "message": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, items)
-	}
-}
-
-func ListDrugRegistrationsHandler(db *pgxpool.Pool) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		items, err := services.ListDrugRegistrations(c.Request.Context(), db)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "list_failed", "message": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, items)
-	}
-}
-
-func ListDrugRegistrationSitesHandler(db *pgxpool.Pool) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		items, err := services.ListDrugRegistrationSites(c.Request.Context(), db)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "list_failed", "message": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, items)
-	}
-}
-
-func ListDrugRegistrationAuthHoldersHandler(db *pgxpool.Pool) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		items, err := services.ListDrugRegistrationAuthHolders(c.Request.Context(), db)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "list_failed", "message": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, items)
+		c.JSON(http.StatusOK, out)
 	}
 }
